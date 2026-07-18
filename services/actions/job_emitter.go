@@ -422,9 +422,15 @@ func (r *jobStatusResolver) resolve(ctx context.Context) map[int64]actions_model
 
 		shouldStartJob, err := evaluateJobIf(ctx, actionRunJob.Run, nil, actionRunJob, r.vars, allSucceed)
 		if err != nil {
-			// TODO: surface deterministic expression errors to users by failing the job with a message.
-			log.Error("evaluateJobIf failed, job will stay blocked: job: %d, err: %v", id, err)
-			continue
+			// Before v1.27 the resolver did not evaluate `if:` here. It dispatched a job that had an
+			// `if:` and let the runner evaluate the expression. Evaluating server-side can fail, for
+			// example while resolving needs.<job_id>.outputs.* references, and returning early left the
+			// job Blocked with nothing to retry it, so the run could stay Blocked forever. Fall back to
+			// the pre-v1.27 behaviour on error: dispatch the job so the runner evaluates `if:`. A
+			// transient failure then resolves on the runner, and a real expression error fails the job
+			// on the runner instead of stranding the whole run.
+			log.Warn("evaluateJobIf failed for job %d, dispatching it to the runner to avoid a stuck Blocked run: %v", id, err)
+			shouldStartJob = true
 		}
 
 		newStatus := util.Iif(shouldStartJob, actions_model.StatusWaiting, actions_model.StatusSkipped)
