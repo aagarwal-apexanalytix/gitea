@@ -11,7 +11,6 @@ import (
 	"gitea.dev/modules/log"
 	"gitea.dev/modules/setting"
 	"gitea.dev/modules/timeutil"
-	actions_service "gitea.dev/services/actions"
 )
 
 // findStuckBlockedActionJobs returns Actions run jobs that have stayed in the Blocked state
@@ -48,10 +47,14 @@ func checkActionsStuckBlockedRuns(ctx context.Context, logger log.Logger, autofi
 		logger.Critical("Unable to cancel blocked Actions jobs: %v", err)
 		return err
 	}
-	// Cancelling the jobs rolls the parent attempt and run out of Blocked. Mirror the
-	// cancel_abandoned_jobs task so watchers and any newly unblocked jobs are updated too.
-	actions_service.NotifyWorkflowJobsAndRunsStatusUpdate(ctx, cancelled)
-	actions_service.EmitJobsIfReadyByJobs(cancelled)
+	// CancelJobs rolls each job's parent attempt and run out of Blocked in the database, which
+	// is the whole repair this check exists to make. The cancel_abandoned_jobs cron additionally
+	// calls NotifyWorkflowJobsAndRunsStatusUpdate + EmitJobsIfReadyByJobs, but those are safe only
+	// inside the running server, where the notifier and webhook subsystems are initialized. The
+	// doctor command boots a minimal context (config + database only), so calling the notifier
+	// here nil-derefs in the webhook path and aborts the fix after it has already committed. A
+	// doctor check must not depend on runtime subsystems, so we stop at the database repair; live
+	// watchers and the run badge reconcile on their next read.
 	logger.Info("Cancelled %d Actions job(s) stuck in the blocked state", len(cancelled))
 	return nil
 }
