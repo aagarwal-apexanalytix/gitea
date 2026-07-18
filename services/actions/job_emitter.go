@@ -589,8 +589,21 @@ func (r *jobStatusResolver) resolve(ctx context.Context) (map[int64]actions_mode
 		// decide before expanding, so failed needs skip the job instead of failing its matrix
 		shouldStartJob, err := evaluateJobIf(ctx, actionRunJob.Run, nil, actionRunJob, r.vars, allSucceed)
 		if err != nil {
-			log.Error("evaluateJobIf failed, job will stay blocked: job: %d, err: %v", id, err)
-			continue
+			var panicked *jobIfPanicError
+			if errors.As(err, &panicked) {
+				// Before v1.27 the resolver dispatched a job that had an `if:` and let the runner
+				// evaluate it. The server-side evaluator can still panic on some
+				// needs.<job_id>.outputs.* shapes. evaluateJobIf recovers that panic. Leaving the
+				// job Blocked strands the run, because nothing re-emits it. Dispatch so the runner
+				// evaluates `if:` (pre-v1.27). A real expression error is util.ErrInvalidArgument:
+				// v28 records it on the job summary and skips the job when that write succeeds, and
+				// any other error stays blocked so the queue can retry it.
+				log.Warn("evaluateJobIf panicked for job %d, dispatching it to the runner to avoid a stuck Blocked run: %v", id, err)
+				shouldStartJob = true
+			} else {
+				log.Error("evaluateJobIf failed, job will stay blocked: job: %d, err: %v", id, err)
+				continue
+			}
 		}
 		if !shouldStartJob {
 			ret[id] = actions_model.StatusSkipped

@@ -119,9 +119,29 @@ func pullRequestTargetBaseSHA(run *actions_model.ActionRun) (string, bool) {
 	return payload.PullRequest.Base.Sha, true
 }
 
+// jobIfPanicError is a panic recovered inside the server-side `if:` evaluator.
+// The resolver dispatches that job to the runner instead of leaving the run Blocked.
+type jobIfPanicError struct {
+	jobID     string
+	recovered any
+}
+
+func (e *jobIfPanicError) Error() string {
+	return fmt.Sprintf("evaluateJobIf panicked while evaluating `if:` for job %q: %v", e.jobID, e.recovered)
+}
+
 // evaluateJobIf evaluates a job's `if:`. An invalid `if:` skips the job and is reported in its summary.
-func evaluateJobIf(ctx context.Context, run *actions_model.ActionRun, attempt *actions_model.ActionRunAttempt, job *actions_model.ActionRunJob, vars map[string]string, allNeedsSucceed bool) (bool, error) {
-	shouldStart, err := resolveJobIf(ctx, run, attempt, job, vars, allNeedsSucceed)
+// The expression evaluator can still panic on some needs.<job_id>.outputs.* shapes. That panic used to
+// escape into the actions_ready_job queue handler, which recovers it but leaves the job Blocked with
+// nothing to re-emit it. Recover it here and return jobIfPanicError so the resolver can dispatch the
+// job and let the runner evaluate `if:`.
+func evaluateJobIf(ctx context.Context, run *actions_model.ActionRun, attempt *actions_model.ActionRunAttempt, job *actions_model.ActionRunJob, vars map[string]string, allNeedsSucceed bool) (shouldStart bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = &jobIfPanicError{jobID: job.JobID, recovered: r}
+		}
+	}()
+	shouldStart, err = resolveJobIf(ctx, run, attempt, job, vars, allNeedsSucceed)
 	if errors.Is(err, util.ErrInvalidArgument) {
 		return false, upsertJobErrorSummary(ctx, job, "if", err)
 	}
