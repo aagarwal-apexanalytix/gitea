@@ -1,0 +1,38 @@
+name: apex-build-image
+
+on:
+  push:
+    branches:
+      - actions-blocked-run-fix
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.rootless
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/aagarwal-apexanalytix/gitea:1.27.0-apex-rootless
+            ghcr.io/aagarwal-apexanalytix/gitea:1.27.0-apex-rootless-${{ github.sha }}
+          build-args: |
+            GITEA_VERSION=1.27.0-apex
