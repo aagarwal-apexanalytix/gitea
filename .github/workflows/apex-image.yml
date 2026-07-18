@@ -31,8 +31,11 @@ jobs:
           file: Dockerfile.rootless
           platforms: linux/amd64
           push: true
+          # NB: the gitea helm chart appends "-rootless" to image.tag when rootless=true, so the
+          # immutable pin tag is 1.27.0-apex-<sha>-rootless (the chart pulls it from image.tag:
+          # 1.27.0-apex-<sha>). The moving 1.27.0-apex-rootless tag is kept for convenience only.
           tags: |
             ghcr.io/aagarwal-apexanalytix/gitea:1.27.0-apex-rootless
-            ghcr.io/aagarwal-apexanalytix/gitea:1.27.0-apex-rootless-${{ github.sha }}
+            ghcr.io/aagarwal-apexanalytix/gitea:1.27.0-apex-${{ github.sha }}-rootless
           build-args: |
             GITEA_VERSION=1.27.0-apex
