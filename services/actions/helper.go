@@ -50,8 +50,19 @@ func getInputsForJob(ctx context.Context, run *actions_model.ActionRun, job *act
 	return p.Inputs, nil
 }
 
-// evaluateJobIf evaluates a job's `if:`
-func evaluateJobIf(ctx context.Context, run *actions_model.ActionRun, attempt *actions_model.ActionRunAttempt, job *actions_model.ActionRunJob, vars map[string]string, allNeedsSucceed bool) (bool, error) {
+// evaluateJobIf evaluates a job's `if:`. Since Gitea v1.27 this runs server-side in the job emitter
+// (before v1.27 the runner evaluated `if:`), and the expression evaluator can panic on some
+// `needs.<job_id>.outputs.*` shapes. That panic escapes into the actions_ready_job queue handler,
+// which recovers it but leaves the job Blocked with nothing to re-emit it, so the whole run stays
+// Blocked forever. Recover any panic and return it as an error; the caller (jobStatusResolver.resolve)
+// then falls back to dispatching the job to the runner, which evaluates `if:` the pre-v1.27 way without
+// the server-side panic.
+func evaluateJobIf(ctx context.Context, run *actions_model.ActionRun, attempt *actions_model.ActionRunAttempt, job *actions_model.ActionRunJob, vars map[string]string, allNeedsSucceed bool) (shouldStart bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("evaluateJobIf panicked while evaluating `if:` for job %q: %v", job.JobID, r)
+		}
+	}()
 	parsedJob, err := job.ParseJob()
 	if err != nil {
 		return false, err
