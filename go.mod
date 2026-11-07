@@ -62,7 +62,7 @@ require (
 	github.com/huandu/xstrings v1.6.1
 	github.com/jhillyerd/enmime/v2 v2.5.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/klauspost/compress v1.20.0
+	github.com/klauspost/compress v1.20.2
 	github.com/lib/pq v1.12.3
 	github.com/markbates/goth v1.82.0
 	github.com/mattn/go-isatty v0.0.24
@@ -95,7 +95,7 @@ require (
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc
 	gitlab.com/gitlab-org/api/client-go/v3 v3.13.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.6.0.20261013184558-04dd63131525
-	golang.org/x/crypto v0.58.0
+	golang.org/x/crypto v0.58.1-0.20261009181718-2f1f834330b2
 	golang.org/x/image v0.46.0
 	golang.org/x/mod v0.41.0
 	golang.org/x/net v0.62.0
@@ -120,7 +120,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.18.2 // indirect
 	github.com/STARRY-S/zip v0.2.3 // indirect
-	github.com/andybalholm/brotli v1.2.1 // indirect
+	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/andybalholm/cascadia v1.3.4 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
