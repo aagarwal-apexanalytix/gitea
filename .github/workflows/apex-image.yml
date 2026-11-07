@@ -1,0 +1,53 @@
+name: apex-build-image
+
+on:
+  push:
+    branches:
+      - actions-blocked-run-fix
+      - actions-blocked-run-fix-v1.27.2
+      - actions-blocked-run-fix-v1.27.3
+      - actions-blocked-run-fix-v28.3.0
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.rootless
+          platforms: linux/amd64
+          push: true
+          # Do NOT cache the golang base layer: Dockerfile.rootless builds FROM the floating tag
+          # golang:1.27-alpine3.24, and pulling it fresh each build is what picks up Go patch
+          # releases. A rebuild alone is what cleared stdlib CVEs on the 1.27 line.
+          pull: true
+          no-cache: false
+          # NB: the gitea helm chart appends "-rootless" to image.tag when rootless=true, so the
+          # immutable pin tag is 28.3.0-apex-<sha>-rootless (the chart pulls it from image.tag:
+          # 28.3.0-apex-<sha>). The moving 28.3.0-apex-rootless tag is kept for convenience only.
+          # GITEA_VERSION is the PLAIN upstream version: a "-apex" suffix is a semver PRE-RELEASE
+          # and makes scanners report the CVEs fixed in that very release as unremediated.
+          # GOFIPS140=v1.0.0 embeds the certified Go Cryptographic Module (CMVP #5247).
+          tags: |
+            ghcr.io/aagarwal-apexanalytix/gitea:28.3.0-apex-rootless
+            ghcr.io/aagarwal-apexanalytix/gitea:28.3.0-apex-${{ github.sha }}-rootless
+          build-args: |
+            GITEA_VERSION=28.3.0
+            GOFIPS140=v1.0.0

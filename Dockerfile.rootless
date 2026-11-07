@@ -15,6 +15,11 @@ ARG GITEA_VERSION
 ARG TAGS=""
 ENV TAGS="bindata timetzdata $TAGS"
 ARG CGO_EXTRA_CFLAGS
+# Link the CMVP-validated Go Cryptographic Module (cert #5247, v1.0.0) and default
+# FIPS 140-3 mode on. Go 1.27 still accepts v1.0.0; v1.26.0 is not certified yet.
+# Do not set GOEXPERIMENT=boringcrypto; it conflicts with this module.
+ARG GOFIPS140=v1.0.0
+ENV GOFIPS140=${GOFIPS140}
 
 # Build deps
 RUN apk --no-cache add \

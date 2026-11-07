@@ -42,7 +42,9 @@ func checkActionsStuckBlockedRuns(ctx context.Context, logger log.Logger, autofi
 		return nil
 	}
 
-	cancelled, err := actions_model.CancelJobs(ctx, jobs)
+	// force=false keeps the graceful cancel. These jobs are Blocked and have no runner task,
+	// so CancelJobs marks them Cancelled directly. v28 added the force argument.
+	cancelled, err := actions_model.CancelJobs(ctx, jobs, false)
 	if err != nil {
 		logger.Critical("Unable to cancel blocked Actions jobs: %v", err)
 		return err
